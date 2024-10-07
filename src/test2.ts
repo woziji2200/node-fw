@@ -1,26 +1,30 @@
 import { app } from './test';
 
-@app.RestfulApi
+@app.RestfulApi()
 export class controller2 {
-    @app.Get('/get')
-    index(@app.required id: number) {
+    @app.get('/get')
+    index(id: number) {
         console.log(11111222);
+        return 'get';
     }
 }
 
-function test(...args: any[]) {
-    console.log(args);
-}
 
 @app.RestfulApi('/api')
 export class controller3 {
-    
-    @app.Get
-    index(qwq: string, @test id: number) {
+    constructor() {
+        console.log('controller3');
+    }
+
+    @app.get('/asdsd')
+    index(
+        @app.param({ name: 'aaa' }) qwq: string,
+        @app.body({ name: 'id' }) id: number,
+        @app.body({ name: 'i1d' }) id2: number
+    ) {
         console.log(11111222);
     }
 
-    qwq() {
-
+    qwq(id: number) {
     }
 }
