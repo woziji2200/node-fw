@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "test": "ts-node ./src/test.ts"
+    "test": "ts-node ./src/test/index.ts"
   },
   "author": "",
   "license": "ISC",
