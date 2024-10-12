@@ -1,5 +1,6 @@
 import { app } from '.';
 import { OptionsSetter } from '../lib/core';
+import * as fw from '../lib/core';
 
 // every controller must be decorated by @app.RestfulApi()
 // 所有的控制器都必须使用@app.RestfulApi()装饰
@@ -73,5 +74,18 @@ export class ApiController {
         @app.param({ name: 'id', defaultValue: 1}) id: number,
     ){
         return { id: id, title: 'news title', content: 'news content' }
+    }
+
+    @app.get('/req_res')
+    async getReqRes(
+        // you can set the default value of the param
+        // 你可以设置参数的默认值
+        @app.req() req: fw.Request,
+        @app.res() res: fw.Response,
+    ){
+
+        console.log('getReqRes:', req.url);
+        res.end('手动结束请求');
+        return
     }
 }

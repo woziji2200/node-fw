@@ -4,8 +4,6 @@ import fw from "../lib/index"
 // 实例化框架
 export let app = new fw();
 
-// 注册路由，参数为路由文件所在目录
-app.registerRouter(path.join(__dirname));
 
 // 全局异常处理中间件
 app.onError(async (err, req, res)=>{
@@ -23,6 +21,9 @@ app.beforeRequest(async (req, res)=>{
 app.beforeRequest('/api/*', async (req, res)=>{
     console.log(`beforeRequestOn '/api/*': there is a request on ${req.method} ${req.url}`);
 })
+
+// 注册路由，参数为路由文件所在目录
+app.registerRouter(path.join(__dirname));
 
 // 同样支持正则表达式
 // app.beforeRequest(/^\/api\/(.*)/, async (req, res)=>{

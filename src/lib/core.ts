@@ -31,13 +31,22 @@ declare interface OptionsSetterWithIndexType {
 }
 export declare interface Request extends http.IncomingMessage { }
 export declare interface Response extends http.ServerResponse { }
+interface RequestWithIndexType {
+    index: number
+}
+interface ResponseWithIndexType {
+    index: number
+}
 export declare interface RoutesType {
     method: string,
     handler: (...args: any[]) => HandlerResponse | Promise<HandlerResponse>,
     routePath: string | RegExp,
     params?: ParamWithIndexType[],
     bodys?: BodyWithIndexType[],
-    optionsSetter?: OptionsSetterWithIndexType[]
+    optionsSetter?: OptionsSetterWithIndexType[],
+    req?: RequestWithIndexType[],
+    res?: ResponseWithIndexType[]
+    
 }
 export declare interface HandlerResponse {
     data: any,
@@ -140,8 +149,8 @@ export default class fw {
                     return false;
                 });
                 // console.log(this.__beforeRequestMiddleWire);
-                
-                
+
+
                 if (!route) {
                     if (this.__errorMiddleWire.length > 0) {
                         this.callMiddleWire(this.__errorMiddleWire, req, res, new Error(`Route ${method} ${pathname} not found`));
@@ -197,7 +206,7 @@ export default class fw {
                     }
                     if (Object.keys(value).length !== 0) {
                         for (let body of route.bodys) {
-                            if(body.required && value[body.name] === undefined) {
+                            if (body.required && value[body.name] === undefined) {
                                 if (this.__errorMiddleWire.length > 0) {
                                     this.callMiddleWire(this.__errorMiddleWire, req, res, new Error(`Post body ${body.name} is required`));
                                 } else {
@@ -218,9 +227,22 @@ export default class fw {
                     }
                 }
 
+                if(route.req){
+                    for (let req2 of route.req) {
+                        args[req2.index] = req;
+                    }
+                }
+                if(route.res){
+                    for (let res2 of route.res) {
+                        args[res2.index] = res;
+                    }
+                }
+
                 const handlerResponse = await route.handler.apply(null, args);
-                const handlerResponseData = tryToString(handlerResponse, res);
-                res.end(handlerResponseData);
+                if (handlerResponse !== undefined) {
+                    const handlerResponseData = tryToString(handlerResponse, res);
+                    res.end(handlerResponseData);
+                }
             })
         });
         this._app.listen(port, callback);
@@ -244,7 +266,9 @@ export default class fw {
                         method: method,
                         params: Reflect.getMetadata('__params', property) || [],
                         bodys: Reflect.getMetadata('__bodys', property) || [],
-                        optionsSetter: Reflect.getMetadata('__optionsSetter', property) || []
+                        optionsSetter: Reflect.getMetadata('__optionsSetter', property) || [],
+                        req: Reflect.getMetadata('__req', property) || [],
+                        res: Reflect.getMetadata('__res', property) || []
                     });
                 }
             }
@@ -279,6 +303,25 @@ export default class fw {
             Reflect.defineMetadata('__optionsSetter', optionsSetter, api);
         }
     }
+
+    public res<T>(){
+        return function (target: T, propertyKey: string, parameterIndex: number) {
+            const api = (target as any)[propertyKey];
+            let res: ResponseWithIndexType[] = Reflect.getMetadata('__res', api) || [];
+            res.push({ index: parameterIndex });
+            Reflect.defineMetadata('__res', res, api);
+        }
+    }
+
+    public req<T>(){
+        return function (target: T, propertyKey: string, parameterIndex: number) {
+            const api = (target as any)[propertyKey];
+            let req: RequestWithIndexType[] = Reflect.getMetadata('__req', api) || [];
+            req.push({ index: parameterIndex });
+            Reflect.defineMetadata('__req', req, api);
+        }
+    }
+
     public urlParam<T>(param: UrlParamType) {
 
     }
@@ -288,12 +331,12 @@ export default class fw {
     public get<T>(routePath: string | RegExp = "", beforeRequest?: MiddleWire | MiddleWire[]) {
         const self = this;
         // console.log(routePath);
-        
+
         return function (target: T, propertyKey: string, descriptor: PropertyDescriptor) {
             Reflect.defineMetadata('__routePath', routePath, descriptor.value);
             Reflect.defineMetadata('__method', 'GET', descriptor.value);
             if (beforeRequest) {
-                if(Array.isArray(beforeRequest)) {
+                if (Array.isArray(beforeRequest)) {
                     Reflect.defineMetadata('__beforeRequest', beforeRequest, descriptor.value);
                 } else {
                     Reflect.defineMetadata('__beforeRequest', [beforeRequest], descriptor.value);
@@ -303,13 +346,13 @@ export default class fw {
     }
 
 
-    public post<T>(routePath: string | RegExp = "", beforeRequest?: MiddleWire  | MiddleWire[]) {
+    public post<T>(routePath: string | RegExp = "", beforeRequest?: MiddleWire | MiddleWire[]) {
         const self = this;
         return function (target: T, propertyKey: string, descriptor: PropertyDescriptor) {
             Reflect.defineMetadata('__routePath', routePath, descriptor.value);
             Reflect.defineMetadata('__method', 'POST', descriptor.value);
             if (beforeRequest) {
-                if(Array.isArray(beforeRequest)) {
+                if (Array.isArray(beforeRequest)) {
                     Reflect.defineMetadata('__beforeRequest', beforeRequest, descriptor.value);
                 } else {
                     Reflect.defineMetadata('__beforeRequest', [beforeRequest], descriptor.value);
@@ -329,7 +372,7 @@ export default class fw {
                 routePath: '*',
                 middleWire: routePath
             });
-        } else if(typeof routePath === 'string' || routePath instanceof RegExp) {
+        } else if (typeof routePath === 'string' || routePath instanceof RegExp) {
             this.__errorMiddleWire.push({
                 routePath: routePath,
                 middleWire: errorMiddleWire as ErrorMiddleWire
@@ -346,7 +389,7 @@ export default class fw {
                 routePath: '*',
                 middleWire: routePath
             });
-        } else if(typeof routePath === 'string' || routePath instanceof RegExp) {
+        } else if (typeof routePath === 'string' || routePath instanceof RegExp) {
             this.__beforeRequestMiddleWire.push({
                 routePath: routePath,
                 middleWire: middleWire as MiddleWire
