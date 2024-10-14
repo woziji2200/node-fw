@@ -1,122 +1,99 @@
-import * as http from 'http';
-import * as url from 'url';
-import * as fs from 'fs';
-import * as path from 'path';
-import "reflect-metadata"
-
-export class InternetError extends Error {
-    statusCode?: number
-    constructor(message: string, statusCode?: number){
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.OptionsSetter = exports.InternetError = void 0;
+const http = __importStar(require("http"));
+const url = __importStar(require("url"));
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
+require("reflect-metadata");
+class InternetError extends Error {
+    constructor(message, statusCode) {
         super(message);
         this.statusCode = statusCode;
     }
 }
-declare interface ParamType {
-    name: string,
-    required?: boolean,
-    defaultValue?: any,
-    checkFunction?: (value: any) => boolean
-}
-interface ParamWithIndexType extends ParamType {
-    index: number
-}
-declare interface BodyType extends ParamType {
-
-}
-declare interface BodyWithIndexType extends BodyType {
-    index: number
-}
-declare interface UrlParamType {
-    name: string,
-    checkFunction?: (value: any) => boolean
-}
-declare interface UrlParamWithIndexType extends UrlParamType {
-    index: number
-}
-declare interface OptionsSetterWithIndexType {
-    index: number,
-}
-export declare interface Request extends http.IncomingMessage { }
-export declare interface Response extends http.ServerResponse { }
-interface RequestWithIndexType {
-    index: number
-}
-interface ResponseWithIndexType {
-    index: number
-}
-interface CustomArgumentType {
-    id: string,
-    handler: (req: Request, res: Response, metadata: {index: number, value: any}) => any
-}
-export declare interface RoutesType {
-    method: string,
-    handler: (...args: any[]) => HandlerResponse | Promise<HandlerResponse>,
-    routePath: string | RegExp,
-    params?: ParamWithIndexType[],
-    bodys?: BodyWithIndexType[],
-    optionsSetter?: OptionsSetterWithIndexType[],
-    req?: RequestWithIndexType[],
-    res?: ResponseWithIndexType[]
-    urlParams?: UrlParamWithIndexType[]
-}
-export declare interface HandlerResponse {
-    data: any,
-    options?: {
-        headers?: { [key: string]: string },
-        statusCode?: number
-    }
-}
-
-export declare type ErrorMiddleWire = (err: InternetError, res: Request, req: Response) => any | Promise<any>
-export declare type MiddleWire = (res: Request, req: Response) => any | Promise<any>
-type MiddleWireArray = { routePath: string | RegExp, middleWire: ErrorMiddleWire | MiddleWire }[]
-function tryToJSON(data: any) {
+exports.InternetError = InternetError;
+function tryToJSON(data) {
     const jsonReg = /^(\{|\[).*(\}|\])$/;
     try {
         if (jsonReg.test(data)) {
             return JSON.parse(data);
         }
-    } catch (e) {
+    }
+    catch (e) {
         return data;
     }
 }
-function tryToString(data: any, res?: Response) {
+function tryToString(data, res) {
     if (typeof data === 'string') {
         if (res) {
             res.setHeader('Content-Type', 'text/plain;charset=utf-8');
         }
         return data;
     }
-
     try {
         const ans = JSON.stringify(data);
         if (res) {
             res.setHeader('Content-Type', 'application/json;charset=utf-8');
         }
-        return ans
-    } catch (e) {
+        return ans;
+    }
+    catch (e) {
         return data;
     }
 }
-
-export default class fw {
-    private _app: http.Server | undefined;
-    private _routes: RoutesType[] = [];
-
+class fw {
     constructor() {
+        this._routes = [];
+        this.__errorMiddleWire = [];
+        this.__beforeRequestMiddleWire = [];
+        this.__beforeRouteMiddleWire = [];
+        this.__afterRequestMiddleWire = [];
+        this.__customArguments = [];
         if (typeof process === 'undefined') {
             throw new Error('This framework can only be run in Node.js');
         }
     }
-
-
-    public registerRouter(routerDir: string) {
-        function requireFiles(dir: string) {
+    registerRouter(routerDir) {
+        function requireFiles(dir) {
             fs.readdirSync(dir).forEach(file => {
                 let filePath = path.join(dir, file);
                 if (fs.statSync(filePath).isDirectory()) {
                     requireFiles(filePath);
-                } else {
+                }
+                else {
                     if (path.extname(filePath).toLowerCase() === '.js' || path.extname(filePath).toLowerCase() === '.ts') {
                         require(filePath);
                     }
@@ -125,37 +102,39 @@ export default class fw {
         }
         requireFiles(routerDir);
     }
-    private async callMiddleWire(middleWires: MiddleWireArray, req: Request, res: Response, error:  InternetError): Promise<any>
-    private async callMiddleWire(middleWires: MiddleWireArray, req: Request, res: Response): Promise<any>
-    private async callMiddleWire(middleWires: MiddleWireArray, req: Request, res: Response, error?: InternetError) {
-        const routePath = url.parse(req.url || '', true).pathname || '';
-        for(let i = 0; i < middleWires.length; i++) {
-            const middleWire = middleWires[i];
-            if (!this.stringEqual(routePath, middleWire.routePath)) {
-                continue;
+    callMiddleWire(middleWires, req, res, error) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const routePath = url.parse(req.url || '', true).pathname || '';
+            for (let i = 0; i < middleWires.length; i++) {
+                const middleWire = middleWires[i];
+                if (!this.stringEqual(routePath, middleWire.routePath)) {
+                    continue;
+                }
+                let flag = undefined;
+                if (error) {
+                    flag = yield middleWire.middleWire(error, req, res);
+                }
+                else {
+                    flag = yield middleWire.middleWire(req, res);
+                }
+                if (flag)
+                    return flag;
             }
-            let flag: any = undefined
-            if (error) {
-                flag = await (middleWire.middleWire as ErrorMiddleWire)(error, req, res);
-            } else {
-                flag = await (middleWire.middleWire as MiddleWire)(req, res);
-            }
-            if(flag) return flag;
-        }
+        });
     }
-    public listen(port: number, callback: () => void) {
-
+    listen(port, callback) {
         // console.dir(this._routes, {depth: null});
         this._app = http.createServer((req, res) => {
-            let chunk: Uint8Array[] = [];
+            let chunk = [];
             req.on('data', (chunk2) => {
                 chunk.push(chunk2);
-            })
-            req.on('end', async () => {
-                let flag: any = undefined
-                flag = await this.callMiddleWire(this.__beforeRequestMiddleWire, req, res);
-                if(flag) return
-
+            });
+            req.on('end', () => __awaiter(this, void 0, void 0, function* () {
+                var _a, _b;
+                let flag = undefined;
+                flag = yield this.callMiddleWire(this.__beforeRequestMiddleWire, req, res);
+                if (flag)
+                    return;
                 let parsedUrl = url.parse(req.url || '', true);
                 let pathname = parsedUrl.pathname || '';
                 let method = req.method || '';
@@ -167,13 +146,13 @@ export default class fw {
                     return false;
                 });
                 // console.log(this.__beforeRequestMiddleWire);
-
-
                 if (!route) {
                     if (this.__errorMiddleWire.length > 0) {
                         flag = this.callMiddleWire(this.__errorMiddleWire, req, res, new Error(`Route ${method} ${pathname} not found`));
-                        if(flag) return;
-                    } else {
+                        if (flag)
+                            return;
+                    }
+                    else {
                         res.writeHead(404, { 'Content-Type': 'text/plain;charset=utf-8' });
                         res.statusCode = 404;
                         res.end(`Route ${pathname} not found`);
@@ -185,16 +164,17 @@ export default class fw {
                 // });
                 // flag = await this.callMiddleWire(this.__beforeRequestMiddleWire, req, res);
                 // if(flag) return;
-
-                let args: any[] = [];
+                let args = [];
                 if (route.params) {
                     for (let param of route.params) {
                         let value = params[param.name];
                         if (value === undefined && param.required) {
                             if (this.__errorMiddleWire.length > 0) {
                                 flag = this.callMiddleWire(this.__errorMiddleWire, req, res, new Error(`Param ${param.name} is required`));
-                                if(flag) return;
-                            } else {
+                                if (flag)
+                                    return;
+                            }
+                            else {
                                 res.writeHead(400, { 'Content-Type': 'text/plain;charset=utf-8' });
                                 res.statusCode = 400;
                                 res.end(`Param ${param.name} is required`);
@@ -204,8 +184,10 @@ export default class fw {
                         if (param.checkFunction && !param.checkFunction(value)) {
                             if (this.__errorMiddleWire.length > 0) {
                                 flag = this.callMiddleWire(this.__errorMiddleWire, req, res, new Error(`Param ${param.name} is invalid`));
-                                if(flag) return;
-                            } else {
+                                if (flag)
+                                    return;
+                            }
+                            else {
                                 res.writeHead(400, { 'Content-Type': 'text/plain;charset=utf-8' });
                                 res.statusCode = 400;
                                 res.end(`Param ${param.name} is invalid`);
@@ -215,12 +197,12 @@ export default class fw {
                         args[param.index] = value || param.defaultValue;
                     }
                 }
-
                 if (route.bodys) {
-                    let value: { [key: string]: any } = {};
-                    if (req.headers['content-type']?.toLowerCase().startsWith('application/json')) {
+                    let value = {};
+                    if ((_a = req.headers['content-type']) === null || _a === void 0 ? void 0 : _a.toLowerCase().startsWith('application/json')) {
                         value = JSON.parse(Buffer.concat(chunk).toString());
-                    } else if (req.headers['content-type']?.toLowerCase().startsWith('application/x-www-form-urlencoded')) {
+                    }
+                    else if ((_b = req.headers['content-type']) === null || _b === void 0 ? void 0 : _b.toLowerCase().startsWith('application/x-www-form-urlencoded')) {
                         const bodyString = Buffer.concat(chunk).toString();
                         for (const [key, bodyValue] of new URLSearchParams(bodyString).entries()) {
                             value[key] = bodyValue;
@@ -231,8 +213,10 @@ export default class fw {
                             if (body.required && value[body.name] === undefined) {
                                 if (this.__errorMiddleWire.length > 0) {
                                     flag = this.callMiddleWire(this.__errorMiddleWire, req, res, new Error(`Post body ${body.name} is required`));
-                                    if(flag) return;
-                                } else {
+                                    if (flag)
+                                        return;
+                                }
+                                else {
                                     res.writeHead(400, { 'Content-Type': 'text/plain;charset=utf-8' });
                                     res.statusCode = 400;
                                     res.end(`Body ${body.name} is required`);
@@ -243,13 +227,11 @@ export default class fw {
                         }
                     }
                 }
-
-
                 if (route.urlParams && typeof route.routePath === 'string') {
-                    function getParams(routePath: string, pathname: string) {
+                    function getParams(routePath, pathname) {
                         const routePathArray = routePath.split('/');
                         const pathnameArray = pathname.split('/');
-                        const params: { [key: string]: string } = {};
+                        const params = {};
                         for (let i = 0; i < routePathArray.length; i++) {
                             if (routePathArray[i].startsWith(':')) {
                                 params[routePathArray[i].slice(1)] = pathnameArray[i];
@@ -263,8 +245,10 @@ export default class fw {
                         if (urlParam.checkFunction && !urlParam.checkFunction(value)) {
                             if (this.__errorMiddleWire.length > 0) {
                                 flag = this.callMiddleWire(this.__errorMiddleWire, req, res, new Error(`Param ${urlParam.name} is invalid`));
-                                if(flag) return;
-                            } else {
+                                if (flag)
+                                    return;
+                            }
+                            else {
                                 res.writeHead(400, { 'Content-Type': 'text/plain;charset=utf-8' });
                                 res.statusCode = 400;
                                 res.end(`Param ${urlParam.name} is invalid`);
@@ -274,13 +258,11 @@ export default class fw {
                         args[urlParam.index] = value;
                     }
                 }
-
                 if (route.optionsSetter) {
                     for (let optionsSetter of route.optionsSetter) {
                         args[optionsSetter.index] = new OptionsSetter(res);
                     }
                 }
-
                 if (route.req) {
                     for (let req2 of route.req) {
                         args[req2.index] = req;
@@ -291,21 +273,24 @@ export default class fw {
                         args[res2.index] = res;
                     }
                 }
-
-                if(this.__customArguments.length > 0) {
-                    for(let customArgument of this.__customArguments) {
-                        const metadata: {index: number, value: any} | undefined = Reflect.getMetadata(customArgument.id, route.handler);
-                        if(metadata === undefined) continue;
-                        if(typeof metadata.index !== 'number'){
+                if (this.__customArguments.length > 0) {
+                    for (let customArgument of this.__customArguments) {
+                        const metadata = Reflect.getMetadata(customArgument.id, route.handler);
+                        if (metadata === undefined)
+                            continue;
+                        if (typeof metadata.index !== 'number') {
                             throw new Error('custom argument decorator must be defined such a metadata: {index: number, value: any}');
                         }
                         try {
                             args[metadata.index] = customArgument.handler(req, res, metadata);
-                        } catch (error: any) {
+                        }
+                        catch (error) {
                             if (this.__errorMiddleWire.length > 0) {
                                 flag = this.callMiddleWire(this.__errorMiddleWire, req, res, error);
-                                if(flag) return;
-                            } else {
+                                if (flag)
+                                    return;
+                            }
+                            else {
                                 res.writeHead(500, { 'Content-Type': 'text/plain;charset=utf-8' });
                                 res.statusCode = 500;
                                 res.end(error.message);
@@ -314,25 +299,23 @@ export default class fw {
                         }
                     }
                 }
-
-                const handlerResponse = await route.handler.apply(null, args);
+                const handlerResponse = yield route.handler.apply(null, args);
                 if (handlerResponse !== undefined) {
                     const handlerResponseData = tryToString(handlerResponse, res);
                     res.end(handlerResponseData);
                 }
-            })
+            }));
         });
         this._app.listen(port, callback);
     }
-
-    public RestfulApi<T>(routePath: string = "") {
-        return (controller: new (...args: any[]) => T) => {
+    RestfulApi(routePath = "") {
+        return (controller) => {
             const prototype = controller.prototype;
             const propertyNames = Object.getOwnPropertyNames(prototype);
             for (const propertyName of propertyNames) {
                 const property = prototype[propertyName];
                 const method = Reflect.getMetadata('__method', property);
-                const beforeRequest = Reflect.getMetadata('__beforeRequest', property) as MiddleWire[] || [];
+                const beforeRequest = Reflect.getMetadata('__beforeRequest', property) || [];
                 beforeRequest.forEach((middleWire) => {
                     this.beforeRequest(routePath + Reflect.getMetadata('__routePath', property), middleWire);
                 });
@@ -350,140 +333,123 @@ export default class fw {
                     });
                 }
             }
-        }
+        };
     }
-
-    public param<T>(param: ParamType) {
-        return function (target: T, propertyKey: string, parameterIndex: number) {
+    param(param) {
+        return function (target, propertyKey, parameterIndex) {
             // param.required = param.required || true;
-            const api = (target as any)[propertyKey];
+            const api = target[propertyKey];
             let params = Reflect.getMetadata('__params', api) || [];
-            params.push({ ...param, index: parameterIndex });
+            params.push(Object.assign(Object.assign({}, param), { index: parameterIndex }));
             Reflect.defineMetadata('__params', params, api);
-        }
+        };
     }
-
-    public body<T>(body: BodyType) {
-        return function (target: T, propertyKey: string, parameterIndex: number) {
+    body(body) {
+        return function (target, propertyKey, parameterIndex) {
             body.required = body.required || true;
-            const api = (target as any)[propertyKey];
+            const api = target[propertyKey];
             let bodys = Reflect.getMetadata('__bodys', api) || [];
-            bodys.push({ ...body, index: parameterIndex });
+            bodys.push(Object.assign(Object.assign({}, body), { index: parameterIndex }));
             Reflect.defineMetadata('__bodys', bodys, api);
-        }
+        };
     }
-
-    public optionsSetter<T>() {
-        return function (target: T, propertyKey: string, parameterIndex: number) {
-            const api = (target as any)[propertyKey];
-            let optionsSetter: OptionsSetterWithIndexType[] = Reflect.getMetadata('__optionsSetter', api) || [];
+    optionsSetter() {
+        return function (target, propertyKey, parameterIndex) {
+            const api = target[propertyKey];
+            let optionsSetter = Reflect.getMetadata('__optionsSetter', api) || [];
             optionsSetter.push({ index: parameterIndex });
             Reflect.defineMetadata('__optionsSetter', optionsSetter, api);
-        }
+        };
     }
-
-    public res<T>() {
-        return function (target: T, propertyKey: string, parameterIndex: number) {
-            const api = (target as any)[propertyKey];
-            let res: ResponseWithIndexType[] = Reflect.getMetadata('__res', api) || [];
+    res() {
+        return function (target, propertyKey, parameterIndex) {
+            const api = target[propertyKey];
+            let res = Reflect.getMetadata('__res', api) || [];
             res.push({ index: parameterIndex });
             Reflect.defineMetadata('__res', res, api);
-        }
+        };
     }
-
-    public req<T>() {
-        return function (target: T, propertyKey: string, parameterIndex: number) {
-            const api = (target as any)[propertyKey];
-            let req: RequestWithIndexType[] = Reflect.getMetadata('__req', api) || [];
+    req() {
+        return function (target, propertyKey, parameterIndex) {
+            const api = target[propertyKey];
+            let req = Reflect.getMetadata('__req', api) || [];
             req.push({ index: parameterIndex });
             Reflect.defineMetadata('__req', req, api);
-        }
+        };
     }
-
-    public urlParam<T>(param: UrlParamType) {
-        return function (target: T, propertyKey: string, parameterIndex: number) {
-            const api = (target as any)[propertyKey];
+    urlParam(param) {
+        return function (target, propertyKey, parameterIndex) {
+            const api = target[propertyKey];
             let urlParams = Reflect.getMetadata('__urlParams', api) || [];
             urlParams.push({ name: param.name, checkFunction: param.checkFunction, index: parameterIndex });
             Reflect.defineMetadata('__urlParams', urlParams, api);
-        }
+        };
     }
-
-
-
-
-    public get<T>(routePath: string | RegExp = "", beforeRequest?: MiddleWire | MiddleWire[]) {
+    get(routePath = "", beforeRequest) {
         const self = this;
         // console.log(routePath);
-
-        return function (target: T, propertyKey: string, descriptor: PropertyDescriptor) {
+        return function (target, propertyKey, descriptor) {
             Reflect.defineMetadata('__routePath', routePath, descriptor.value);
             Reflect.defineMetadata('__method', 'GET', descriptor.value);
             if (beforeRequest) {
                 if (Array.isArray(beforeRequest)) {
                     Reflect.defineMetadata('__beforeRequest', beforeRequest, descriptor.value);
-                } else {
+                }
+                else {
                     Reflect.defineMetadata('__beforeRequest', [beforeRequest], descriptor.value);
                 }
             }
-        }
+        };
     }
-
-
-    public post<T>(routePath: string | RegExp = "", beforeRequest?: MiddleWire | MiddleWire[]) {
+    post(routePath = "", beforeRequest) {
         const self = this;
-        return function (target: T, propertyKey: string, descriptor: PropertyDescriptor) {
+        return function (target, propertyKey, descriptor) {
             Reflect.defineMetadata('__routePath', routePath, descriptor.value);
             Reflect.defineMetadata('__method', 'POST', descriptor.value);
             if (beforeRequest) {
                 if (Array.isArray(beforeRequest)) {
                     Reflect.defineMetadata('__beforeRequest', beforeRequest, descriptor.value);
-                } else {
+                }
+                else {
                     Reflect.defineMetadata('__beforeRequest', [beforeRequest], descriptor.value);
                 }
             }
-        }
+        };
     }
-
-    private __errorMiddleWire: MiddleWireArray = []
-    private __beforeRequestMiddleWire: MiddleWireArray = []
-    private __beforeRouteMiddleWire: MiddleWireArray = []
-    private __afterRequestMiddleWire: MiddleWireArray = []
-    public onError(routePath: string | RegExp, errorMiddleWire: ErrorMiddleWire): void
-    public onError(errorMiddleWire: ErrorMiddleWire): void
-    public onError(routePath: string | RegExp | ErrorMiddleWire, errorMiddleWire?: ErrorMiddleWire) {
+    onError(routePath, errorMiddleWire) {
         if (typeof routePath === 'function') {
             this.__errorMiddleWire.push({
                 routePath: '*',
                 middleWire: routePath
             });
-        } else if (typeof routePath === 'string' || routePath instanceof RegExp) {
+        }
+        else if (typeof routePath === 'string' || routePath instanceof RegExp) {
             this.__errorMiddleWire.push({
                 routePath: routePath,
-                middleWire: errorMiddleWire as ErrorMiddleWire
+                middleWire: errorMiddleWire
             });
-        } else {
+        }
+        else {
             throw new Error('Invalid parameter');
         }
     }
-    public beforeRequest(routePath: string | RegExp, middleWire: MiddleWire): void
-    public beforeRequest(middleWire: MiddleWire): void
-    public beforeRequest(routePath: string | RegExp | MiddleWire, middleWire?: MiddleWire) {
+    beforeRequest(routePath, middleWire) {
         if (typeof routePath === 'function') {
             this.__beforeRequestMiddleWire.push({
                 routePath: '*',
                 middleWire: routePath
             });
-        } else if (typeof routePath === 'string' || routePath instanceof RegExp) {
+        }
+        else if (typeof routePath === 'string' || routePath instanceof RegExp) {
             this.__beforeRequestMiddleWire.push({
                 routePath: routePath,
-                middleWire: middleWire as MiddleWire
+                middleWire: middleWire
             });
-        } else {
+        }
+        else {
             throw new Error('Invalid parameter');
         }
     }
-
     // public beforeRoute(routePath: string | RegExp, middleWire: MiddleWire): void
     // public beforeRoute(middleWire: MiddleWire): void
     // public beforeRoute(routePath: string | RegExp | MiddleWire, middleWire?: MiddleWire) {
@@ -501,9 +467,9 @@ export default class fw {
     //         throw new Error('Invalid parameter');
     //     }
     // }
-
-    private stringEqual(a: string, b: string | RegExp) {
-        if (b === "*") return true;
+    stringEqual(a, b) {
+        if (b === "*")
+            return true;
         if (b instanceof RegExp) {
             return b.test(a);
         }
@@ -518,49 +484,46 @@ export default class fw {
             if (aArray.length === bArray.length) {
                 let flag = true;
                 for (let i = 0; i < aArray.length; i++) {
-                    if (bArray[i].startsWith(':')) continue;
+                    if (bArray[i].startsWith(':'))
+                        continue;
                     if (aArray[i] !== bArray[i]) {
                         flag = false;
                         break;
                     }
                 }
-                if (flag) return true;
+                if (flag)
+                    return true;
             }
         }
         return a === b;
     }
-    private __customArguments: CustomArgumentType[] = []
-    public defineArgument(customArgument: CustomArgumentType) {
+    defineArgument(customArgument) {
         this.__customArguments.push(customArgument);
     }
 }
-
-
-export class OptionsSetter {
-    private headers?: { [key: string]: string };
-    private statusCode?: number;
-    private res: Response;
-    constructor(res: Response) {
+exports.default = fw;
+class OptionsSetter {
+    constructor(res) {
         this.res = res;
     }
-    setHeaders(headers: { [key: string]: string }) {
+    setHeaders(headers) {
         this.headers = headers;
         for (let key in headers) {
             this.res.setHeader(key, headers[key]);
         }
     }
-    pushHeaders(headers: { [key: string]: string }) {
+    pushHeaders(headers) {
         if (!this.headers) {
             this.headers = {};
         }
-        this.headers = { ...this.headers, ...headers };
+        this.headers = Object.assign(Object.assign({}, this.headers), headers);
         for (let key in headers) {
             this.res.setHeader(key, headers[key]);
         }
     }
-
-    setStatusCode(statusCode: number) {
+    setStatusCode(statusCode) {
         // this.statusCode = statusCode;
-        this.res.statusCode = statusCode
+        this.res.statusCode = statusCode;
     }
 }
+exports.OptionsSetter = OptionsSetter;

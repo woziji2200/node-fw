@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --outDir ./dist",
     "test": "ts-node ./src/test/index.ts"
   },
   "author": "",

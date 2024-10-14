@@ -3,7 +3,7 @@ import fw from "../lib/index"
 import { utils } from "../lib/index";
 
 // 实例化框架
-export let app = new fw();
+export let app = new fw;
 
 
 // 全局异常处理中间件
