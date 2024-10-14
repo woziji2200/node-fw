@@ -35,3 +35,6 @@ export class test {
     
 }
 ```
+
+### 完整文档
+[使用文档](doc/README.md)
