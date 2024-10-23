@@ -86,6 +86,14 @@ class fw {
             throw new Error('This framework can only be run in Node.js');
         }
     }
+    /**
+     * 注册路由，将整个指定文件夹下的文件注册到框架中
+     * @param routerDir 路由文件夹路径
+     * @example
+     * ```ts
+     * app.registerRouter(path.join(__dirname, 'router'));
+     * ```
+     */
     registerRouter(routerDir) {
         function requireFiles(dir) {
             fs.readdirSync(dir).forEach(file => {
@@ -122,6 +130,11 @@ class fw {
             }
         });
     }
+    /**
+     * 开始监听，启动服务器
+     * @param port 监听端口
+     * @param callback 成功回调
+     */
     listen(port, callback) {
         // console.dir(this._routes, {depth: null});
         this._app = http.createServer((req, res) => {
@@ -308,6 +321,12 @@ class fw {
         });
         this._app.listen(port, callback);
     }
+    /**
+     * 将一个类注册中的特定函数注册为接口
+     * @param routePath 基础路由路径
+     * @returns
+     *
+     */
     RestfulApi(routePath = "") {
         return (controller) => {
             const prototype = controller.prototype;
@@ -335,6 +354,11 @@ class fw {
             }
         };
     }
+    /**
+     * 获取GET请求参数
+     * @param param 参数配置项
+     * @returns
+     */
     param(param) {
         return function (target, propertyKey, parameterIndex) {
             // param.required = param.required || true;
@@ -344,6 +368,11 @@ class fw {
             Reflect.defineMetadata('__params', params, api);
         };
     }
+    /**
+     * 获取POST请求参数，自动解析application/json和x-www-form-urlencoded
+     * @param body 参数配置项
+     * @returns
+     */
     body(body) {
         return function (target, propertyKey, parameterIndex) {
             body.required = body.required || true;
@@ -353,6 +382,10 @@ class fw {
             Reflect.defineMetadata('__bodys', bodys, api);
         };
     }
+    /**
+     * 获取OptionsSetter，用于设置headers和statusCode等
+     * @returns
+     */
     optionsSetter() {
         return function (target, propertyKey, parameterIndex) {
             const api = target[propertyKey];
@@ -361,6 +394,10 @@ class fw {
             Reflect.defineMetadata('__optionsSetter', optionsSetter, api);
         };
     }
+    /**
+     * 获取请求Response对象
+     * @returns
+     */
     res() {
         return function (target, propertyKey, parameterIndex) {
             const api = target[propertyKey];
@@ -369,6 +406,10 @@ class fw {
             Reflect.defineMetadata('__res', res, api);
         };
     }
+    /**
+     * 获取请求Request对象
+     * @returns
+     */
     req() {
         return function (target, propertyKey, parameterIndex) {
             const api = target[propertyKey];
@@ -377,6 +418,11 @@ class fw {
             Reflect.defineMetadata('__req', req, api);
         };
     }
+    /**
+     * 获取URL参数，例如 /a/:id
+     * @param param 参数配置项
+     * @returns
+     */
     urlParam(param) {
         return function (target, propertyKey, parameterIndex) {
             const api = target[propertyKey];
@@ -385,6 +431,12 @@ class fw {
             Reflect.defineMetadata('__urlParams', urlParams, api);
         };
     }
+    /**
+     * 将该函数注册为GET请求
+     * @param routePath 路由路径
+     * @param beforeRequest 请求前中间件，只对当前路由有效
+     * @returns
+     */
     get(routePath = "", beforeRequest) {
         const self = this;
         // console.log(routePath);
@@ -401,6 +453,12 @@ class fw {
             }
         };
     }
+    /**
+     * 将该函数注册为POST请求
+     * @param routePath 路由路径
+     * @param beforeRequest 请求前中间件，只对当前路由有效
+     * @returns
+     */
     post(routePath = "", beforeRequest) {
         const self = this;
         return function (target, propertyKey, descriptor) {
@@ -497,6 +555,11 @@ class fw {
         }
         return a === b;
     }
+    /**
+     * 定义一个自定义装饰器参数
+     * @param customArgument 自定义参数配置项
+     * @returns
+     */
     defineArgument(customArgument) {
         this.__customArguments.push(customArgument);
     }
@@ -506,12 +569,20 @@ class OptionsSetter {
     constructor(res) {
         this.res = res;
     }
+    /**
+     * 将header设置为指定值，会覆盖之前的值
+     * @param headers headers
+     */
     setHeaders(headers) {
         this.headers = headers;
         for (let key in headers) {
             this.res.setHeader(key, headers[key]);
         }
     }
+    /**
+     * 添加header，不会覆盖之前的值
+     * @param headers headers
+     */
     pushHeaders(headers) {
         if (!this.headers) {
             this.headers = {};
@@ -521,6 +592,10 @@ class OptionsSetter {
             this.res.setHeader(key, headers[key]);
         }
     }
+    /**
+     * 设置HTTP状态码
+     * @param statusCode HTTP状态码
+     */
     setStatusCode(statusCode) {
         // this.statusCode = statusCode;
         this.res.statusCode = statusCode;

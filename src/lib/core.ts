@@ -4,36 +4,60 @@ import * as fs from 'fs';
 import * as path from 'path';
 import "reflect-metadata"
 
+
 export class InternetError extends Error {
     statusCode?: number
-    constructor(message: string, statusCode?: number){
+    constructor(message: string, statusCode?: number) {
         super(message);
         this.statusCode = statusCode;
     }
 }
+
+/**
+ * GET请求的URL参数
+ */
 declare interface ParamType {
+    /** 参数名，是客户端发送给后端的参数对应的名称 */
     name: string,
+    /** 是否必须，默认为false */
     required?: boolean,
+    /** 默认值 */
     defaultValue?: any,
+    /** 参数检查函数，如果返回false，抛出一个异常 */
     checkFunction?: (value: any) => boolean
 }
 interface ParamWithIndexType extends ParamType {
     index: number
 }
-declare interface BodyType extends ParamType {
-
-}
-declare interface BodyWithIndexType extends BodyType {
-    index: number
-}
-declare interface UrlParamType {
+/**
+ * POST请求的body参数
+ */
+declare interface BodyType {
+    /** 参数名，是客户端发送给后端的参数对应的名称 */
     name: string,
+    /** 是否必须，默认为false */
+    required?: boolean,
+    /** 默认值 */
+    defaultValue?: any,
+    /** 参数检查函数，如果返回false，抛出一个异常 */
     checkFunction?: (value: any) => boolean
 }
-declare interface UrlParamWithIndexType extends UrlParamType {
+interface BodyWithIndexType extends BodyType {
     index: number
 }
-declare interface OptionsSetterWithIndexType {
+/**
+ * URL参数，形如 /a/:id
+ */
+declare interface UrlParamType {
+    /** 参数名，例如/a/:id中的id */
+    name: string,
+    /** 参数检查函数，如果返回false，抛出一个异常 */
+    checkFunction?: (value: any) => boolean
+}
+interface UrlParamWithIndexType extends UrlParamType {
+    index: number
+}
+interface OptionsSetterWithIndexType {
     index: number,
 }
 export declare interface Request extends http.IncomingMessage { }
@@ -44,11 +68,19 @@ interface RequestWithIndexType {
 interface ResponseWithIndexType {
     index: number
 }
-interface CustomArgumentType {
+/**
+ * 自定义修饰器参数
+ */
+declare interface CustomArgumentType {
+    /** 修饰器的id */
     id: string,
-    handler: (req: Request, res: Response, metadata: {index: number, value: any}) => any
+    /** 修饰器的处理函数 */
+    handler: (
+        req: Request,
+        res: Response,
+        metadata: { index: number, value: any }) => any
 }
-export declare interface RoutesType {
+interface RoutesType {
     method: string,
     handler: (...args: any[]) => HandlerResponse | Promise<HandlerResponse>,
     routePath: string | RegExp,
@@ -66,8 +98,9 @@ export declare interface HandlerResponse {
         statusCode?: number
     }
 }
-
+/** 异常处理中间件 */
 export declare type ErrorMiddleWire = (err: InternetError, res: Request, req: Response) => any | Promise<any>
+/** 通用中间件 */
 export declare type MiddleWire = (res: Request, req: Response) => any | Promise<any>
 type MiddleWireArray = { routePath: string | RegExp, middleWire: ErrorMiddleWire | MiddleWire }[]
 function tryToJSON(data: any) {
@@ -95,6 +128,8 @@ function tryToString(data: any, res?: Response) {
         }
         return ans
     } catch (e) {
+        console.log(e);
+        
         return data;
     }
 }
@@ -109,7 +144,14 @@ export default class fw {
         }
     }
 
-
+    /**
+     * 注册路由，将整个指定文件夹下的文件注册到框架中
+     * @param routerDir 路由文件夹路径
+     * @example
+     * ```ts
+     * app.registerRouter(path.join(__dirname, 'router'));
+     * ```
+     */
     public registerRouter(routerDir: string) {
         function requireFiles(dir: string) {
             fs.readdirSync(dir).forEach(file => {
@@ -125,11 +167,12 @@ export default class fw {
         }
         requireFiles(routerDir);
     }
-    private async callMiddleWire(middleWires: MiddleWireArray, req: Request, res: Response, error:  InternetError): Promise<any>
+
+    private async callMiddleWire(middleWires: MiddleWireArray, req: Request, res: Response, error: InternetError): Promise<any>
     private async callMiddleWire(middleWires: MiddleWireArray, req: Request, res: Response): Promise<any>
     private async callMiddleWire(middleWires: MiddleWireArray, req: Request, res: Response, error?: InternetError) {
         const routePath = url.parse(req.url || '', true).pathname || '';
-        for(let i = 0; i < middleWires.length; i++) {
+        for (let i = 0; i < middleWires.length; i++) {
             const middleWire = middleWires[i];
             if (!this.stringEqual(routePath, middleWire.routePath)) {
                 continue;
@@ -140,9 +183,15 @@ export default class fw {
             } else {
                 flag = await (middleWire.middleWire as MiddleWire)(req, res);
             }
-            if(flag) return flag;
+            if (flag) return flag;
         }
     }
+
+    /**
+     * 开始监听，启动服务器
+     * @param port 监听端口
+     * @param callback 成功回调
+     */
     public listen(port: number, callback: () => void) {
 
         // console.dir(this._routes, {depth: null});
@@ -154,7 +203,8 @@ export default class fw {
             req.on('end', async () => {
                 let flag: any = undefined
                 flag = await this.callMiddleWire(this.__beforeRequestMiddleWire, req, res);
-                if(flag) return
+                if (flag) return
+
 
                 let parsedUrl = url.parse(req.url || '', true);
                 let pathname = parsedUrl.pathname || '';
@@ -172,7 +222,7 @@ export default class fw {
                 if (!route) {
                     if (this.__errorMiddleWire.length > 0) {
                         flag = this.callMiddleWire(this.__errorMiddleWire, req, res, new Error(`Route ${method} ${pathname} not found`));
-                        if(flag) return;
+                        if (flag) return;
                     } else {
                         res.writeHead(404, { 'Content-Type': 'text/plain;charset=utf-8' });
                         res.statusCode = 404;
@@ -180,6 +230,9 @@ export default class fw {
                     }
                     return;
                 }
+
+                // console.log('route', route);
+                
                 // this.__beforeRequestMiddleWire.forEach(async (middleWire) => {
                 //     (await middleWire)(req, res);
                 // });
@@ -193,7 +246,7 @@ export default class fw {
                         if (value === undefined && param.required) {
                             if (this.__errorMiddleWire.length > 0) {
                                 flag = this.callMiddleWire(this.__errorMiddleWire, req, res, new Error(`Param ${param.name} is required`));
-                                if(flag) return;
+                                if (flag) return;
                             } else {
                                 res.writeHead(400, { 'Content-Type': 'text/plain;charset=utf-8' });
                                 res.statusCode = 400;
@@ -204,7 +257,7 @@ export default class fw {
                         if (param.checkFunction && !param.checkFunction(value)) {
                             if (this.__errorMiddleWire.length > 0) {
                                 flag = this.callMiddleWire(this.__errorMiddleWire, req, res, new Error(`Param ${param.name} is invalid`));
-                                if(flag) return;
+                                if (flag) return;
                             } else {
                                 res.writeHead(400, { 'Content-Type': 'text/plain;charset=utf-8' });
                                 res.statusCode = 400;
@@ -230,8 +283,8 @@ export default class fw {
                         for (let body of route.bodys) {
                             if (body.required && value[body.name] === undefined) {
                                 if (this.__errorMiddleWire.length > 0) {
-                                    flag = this.callMiddleWire(this.__errorMiddleWire, req, res, new Error(`Post body ${body.name} is required`));
-                                    if(flag) return;
+                                    flag = this.callMiddleWire(this.__errorMiddleWire, req, res, new Error(`body ${body.name} is required`));
+                                    if (flag) return;
                                 } else {
                                     res.writeHead(400, { 'Content-Type': 'text/plain;charset=utf-8' });
                                     res.statusCode = 400;
@@ -263,7 +316,7 @@ export default class fw {
                         if (urlParam.checkFunction && !urlParam.checkFunction(value)) {
                             if (this.__errorMiddleWire.length > 0) {
                                 flag = this.callMiddleWire(this.__errorMiddleWire, req, res, new Error(`Param ${urlParam.name} is invalid`));
-                                if(flag) return;
+                                if (flag) return;
                             } else {
                                 res.writeHead(400, { 'Content-Type': 'text/plain;charset=utf-8' });
                                 res.statusCode = 400;
@@ -292,11 +345,11 @@ export default class fw {
                     }
                 }
 
-                if(this.__customArguments.length > 0) {
-                    for(let customArgument of this.__customArguments) {
-                        const metadata: {index: number, value: any} | undefined = Reflect.getMetadata(customArgument.id, route.handler);
-                        if(metadata === undefined) continue;
-                        if(typeof metadata.index !== 'number'){
+                if (this.__customArguments.length > 0) {
+                    for (let customArgument of this.__customArguments) {
+                        const metadata: { index: number, value: any } | undefined = Reflect.getMetadata(customArgument.id, route.handler);
+                        if (metadata === undefined) continue;
+                        if (typeof metadata.index !== 'number') {
                             throw new Error('custom argument decorator must be defined such a metadata: {index: number, value: any}');
                         }
                         try {
@@ -304,7 +357,7 @@ export default class fw {
                         } catch (error: any) {
                             if (this.__errorMiddleWire.length > 0) {
                                 flag = this.callMiddleWire(this.__errorMiddleWire, req, res, error);
-                                if(flag) return;
+                                if (flag) return;
                             } else {
                                 res.writeHead(500, { 'Content-Type': 'text/plain;charset=utf-8' });
                                 res.statusCode = 500;
@@ -316,8 +369,15 @@ export default class fw {
                 }
 
                 const handlerResponse = await route.handler.apply(null, args);
+
+                flag = await this.callMiddleWire(this.__afterRequestMiddleWire, req, res);
+                if (flag) return;
+
+
                 if (handlerResponse !== undefined) {
                     const handlerResponseData = tryToString(handlerResponse, res);
+                    console.log(handlerResponseData);
+                    
                     res.end(handlerResponseData);
                 }
             })
@@ -325,6 +385,12 @@ export default class fw {
         this._app.listen(port, callback);
     }
 
+    /**
+     * 将一个类注册中的特定函数注册为接口
+     * @param routePath 基础路由路径
+     * @returns 
+     * 
+     */
     public RestfulApi<T>(routePath: string = "") {
         return (controller: new (...args: any[]) => T) => {
             const prototype = controller.prototype;
@@ -353,6 +419,11 @@ export default class fw {
         }
     }
 
+    /**
+     * 获取GET请求参数
+     * @param param 参数配置项
+     * @returns 
+     */
     public param<T>(param: ParamType) {
         return function (target: T, propertyKey: string, parameterIndex: number) {
             // param.required = param.required || true;
@@ -363,6 +434,11 @@ export default class fw {
         }
     }
 
+    /**
+     * 获取POST请求参数，自动解析application/json和x-www-form-urlencoded
+     * @param body 参数配置项
+     * @returns 
+     */
     public body<T>(body: BodyType) {
         return function (target: T, propertyKey: string, parameterIndex: number) {
             body.required = body.required || true;
@@ -373,6 +449,10 @@ export default class fw {
         }
     }
 
+    /**
+     * 获取OptionsSetter，用于设置headers和statusCode等
+     * @returns 
+     */
     public optionsSetter<T>() {
         return function (target: T, propertyKey: string, parameterIndex: number) {
             const api = (target as any)[propertyKey];
@@ -382,6 +462,10 @@ export default class fw {
         }
     }
 
+    /**
+     * 获取请求Response对象
+     * @returns 
+     */
     public res<T>() {
         return function (target: T, propertyKey: string, parameterIndex: number) {
             const api = (target as any)[propertyKey];
@@ -391,6 +475,10 @@ export default class fw {
         }
     }
 
+    /**
+     * 获取请求Request对象
+     * @returns 
+     */
     public req<T>() {
         return function (target: T, propertyKey: string, parameterIndex: number) {
             const api = (target as any)[propertyKey];
@@ -400,6 +488,11 @@ export default class fw {
         }
     }
 
+    /**
+     * 获取URL参数，例如 /a/:id
+     * @param param 参数配置项
+     * @returns 
+     */
     public urlParam<T>(param: UrlParamType) {
         return function (target: T, propertyKey: string, parameterIndex: number) {
             const api = (target as any)[propertyKey];
@@ -411,7 +504,12 @@ export default class fw {
 
 
 
-
+    /**
+     * 将该函数注册为GET请求
+     * @param routePath 路由路径
+     * @param beforeRequest 请求前中间件，只对当前路由有效
+     * @returns 
+     */
     public get<T>(routePath: string | RegExp = "", beforeRequest?: MiddleWire | MiddleWire[]) {
         const self = this;
         // console.log(routePath);
@@ -430,6 +528,12 @@ export default class fw {
     }
 
 
+    /**
+     * 将该函数注册为POST请求
+     * @param routePath 路由路径
+     * @param beforeRequest 请求前中间件，只对当前路由有效
+     * @returns 
+     */
     public post<T>(routePath: string | RegExp = "", beforeRequest?: MiddleWire | MiddleWire[]) {
         const self = this;
         return function (target: T, propertyKey: string, descriptor: PropertyDescriptor) {
@@ -445,11 +549,66 @@ export default class fw {
         }
     }
 
+    /**
+     * 将该函数注册为PUT请求
+     * @param routePath 路由路径
+     * @param beforeRequest 请求前中间件，只对当前路由有效
+     * @returns 
+     */
+    public put<T>(routePath: string | RegExp = "", beforeRequest?: MiddleWire | MiddleWire[]) {
+        const self = this;
+        return function (target: T, propertyKey: string, descriptor: PropertyDescriptor) {
+            Reflect.defineMetadata('__routePath', routePath, descriptor.value);
+            Reflect.defineMetadata('__method', 'PUT', descriptor.value);
+            if (beforeRequest) {
+                if (Array.isArray(beforeRequest)) {
+                    Reflect.defineMetadata('__beforeRequest', beforeRequest, descriptor.value);
+                } else {
+                    Reflect.defineMetadata('__beforeRequest', [beforeRequest], descriptor.value);
+                }
+            }
+        }
+    }
+
+
+    /**
+     * 将该函数注册为DELETE请求
+     * @param routePath 路由路径
+     * @param beforeRequest 请求前中间件，只对当前路由有效
+     * @returns 
+     */
+    public delete<T>(routePath: string | RegExp = "", beforeRequest?: MiddleWire | MiddleWire[]) {
+        const self = this;
+        return function (target: T, propertyKey: string, descriptor: PropertyDescriptor) {
+            Reflect.defineMetadata('__routePath', routePath, descriptor.value);
+            Reflect.defineMetadata('__method', 'DELETE', descriptor.value);
+            if (beforeRequest) {
+                if (Array.isArray(beforeRequest)) {
+                    Reflect.defineMetadata('__beforeRequest', beforeRequest, descriptor.value);
+                } else {
+                    Reflect.defineMetadata('__beforeRequest', [beforeRequest], descriptor.value);
+                }
+            }
+        }
+    }
+
+
     private __errorMiddleWire: MiddleWireArray = []
     private __beforeRequestMiddleWire: MiddleWireArray = []
-    private __beforeRouteMiddleWire: MiddleWireArray = []
+    // private __beforeRouteMiddleWire: MiddleWireArray = []
     private __afterRequestMiddleWire: MiddleWireArray = []
+
+
+    /**
+     * 加载错误处理中间件
+     * @param routePath 生效路径
+     * @param errorMiddleWire 错误处理中间件
+     */
     public onError(routePath: string | RegExp, errorMiddleWire: ErrorMiddleWire): void
+    /**
+     * 加载错误处理中间件
+     * @param errorMiddleWire 错误处理中间件
+     */
     public onError(errorMiddleWire: ErrorMiddleWire): void
     public onError(routePath: string | RegExp | ErrorMiddleWire, errorMiddleWire?: ErrorMiddleWire) {
         if (typeof routePath === 'function') {
@@ -466,7 +625,20 @@ export default class fw {
             throw new Error('Invalid parameter');
         }
     }
+
+    /**
+     * 加载前置中间件
+     * @param routePath 生效路径
+     * @param middleWire 前置中间件
+     * @returns
+     * 
+     */
     public beforeRequest(routePath: string | RegExp, middleWire: MiddleWire): void
+    /**
+     * 加载前置中间件
+     * @param middleWire 前置中间件
+     * @returns
+     */
     public beforeRequest(middleWire: MiddleWire): void
     public beforeRequest(routePath: string | RegExp | MiddleWire, middleWire?: MiddleWire) {
         if (typeof routePath === 'function') {
@@ -476,6 +648,33 @@ export default class fw {
             });
         } else if (typeof routePath === 'string' || routePath instanceof RegExp) {
             this.__beforeRequestMiddleWire.push({
+                routePath: routePath,
+                middleWire: middleWire as MiddleWire
+            });
+        } else {
+            throw new Error('Invalid parameter');
+        }
+    }
+
+    /**
+     * 加载后置中间件
+     * @param routePath 生效路径
+     * @param middleWire 后置中间件
+     */
+    public afterRequest(routePath: string | RegExp, middleWire: MiddleWire): void
+    /**
+     * 加载后置中间件
+     * @param middleWire 后置中间件
+     */
+    public afterRequest(middleWire: MiddleWire): void
+    public afterRequest(routePath: string | RegExp | MiddleWire, middleWire?: MiddleWire) {
+        if (typeof routePath === 'function') {
+            this.__afterRequestMiddleWire.push({
+                routePath: '*',
+                middleWire: routePath
+            });
+        } else if (typeof routePath === 'string' || routePath instanceof RegExp) {
+            this.__afterRequestMiddleWire.push({
                 routePath: routePath,
                 middleWire: middleWire as MiddleWire
             });
@@ -530,6 +729,11 @@ export default class fw {
         return a === b;
     }
     private __customArguments: CustomArgumentType[] = []
+    /**
+     * 定义一个自定义装饰器参数
+     * @param customArgument 自定义参数配置项
+     * @returns
+     */
     public defineArgument(customArgument: CustomArgumentType) {
         this.__customArguments.push(customArgument);
     }
@@ -543,12 +747,20 @@ export class OptionsSetter {
     constructor(res: Response) {
         this.res = res;
     }
+    /**
+     * 将header设置为指定值，会覆盖之前的值
+     * @param headers headers
+     */
     setHeaders(headers: { [key: string]: string }) {
         this.headers = headers;
         for (let key in headers) {
             this.res.setHeader(key, headers[key]);
         }
     }
+    /**
+     * 添加header，不会覆盖之前的值
+     * @param headers headers
+     */
     pushHeaders(headers: { [key: string]: string }) {
         if (!this.headers) {
             this.headers = {};
@@ -558,7 +770,10 @@ export class OptionsSetter {
             this.res.setHeader(key, headers[key]);
         }
     }
-
+    /**
+     * 设置HTTP状态码
+     * @param statusCode HTTP状态码
+     */
     setStatusCode(statusCode: number) {
         // this.statusCode = statusCode;
         this.res.statusCode = statusCode

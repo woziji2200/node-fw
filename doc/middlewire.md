@@ -1,5 +1,5 @@
 ## 中间件
-支持全局异常处理和全局路由两种中间件
+支持全局异常处理、全局前置路由、全局后置路由三种中间件
 
 ### 全局异常处理
 当发生异常时（例如缺少required的参数、checkFunction检测不合法等），将会自动调用onError注册的中间件
@@ -22,9 +22,18 @@ app.onError(async (err, req, res)=>{
 });
 ```
 
-### 全局路由中间件
+### 全局前置路由中间件
 ```ts
 app.beforeRequest(
+    routePath?: string | RegExp,
+    handler: (req: fw.Request, res: fw.Response) => any | Promise<any>
+)
+```
+当返回值为`true`或者`Promise<true>`或者所有可以被认为是true的值时，将会结束请求。此时结束请求必须要手动返回响应值
+
+### 全局后置路由中间件
+```ts
+app.afterRequest(
     routePath?: string | RegExp,
     handler: (req: fw.Request, res: fw.Response) => any | Promise<any>
 )
@@ -42,6 +51,7 @@ app.get(
 
 ### 路由匹配规则
 `routePath`取值可为：
-    - "*"：将对所有接口生效
-    - "/api/*"：将对所有符合/api/xxx的接口生效
-    - RegExp：将使用正则匹配接口
+
+- "*"：将对所有接口生效
+- "/api/*"：将对所有符合/api/xxx的接口生效
+- RegExp：将使用正则匹配接口

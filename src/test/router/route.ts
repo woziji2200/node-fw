@@ -99,6 +99,22 @@ export class ApiController {
         res.end('手动结束请求');
         return
     }
+
+    @app.delete('/delete')
+    async delete(
+        @app.param({ name: 'id', required: true }) id: string,
+        @app.body({ name: 'username', required: true }) username: string,
+    ) {
+        return { id, username }
+    }
+
+    @app.put('/put')
+    async put(
+        @app.param({ name: 'id', required: true }) id: string,
+        @app.body({ name: 'username', required: true }) username: string,
+    ) {
+        return { id, username }
+    }
 }
 
 

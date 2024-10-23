@@ -7,16 +7,11 @@ export let app = new fw();
 
 
 // 全局异常处理中间件
-app.onError(async (err, req, res)=>{
-    res.statusCode = 500;
-    console.error(`onError: ${err.message}`);
-    if(err.statusCode) res.statusCode = err.statusCode;
-    res.end(`${err.message}`);
-});
+app.onError(utils.errorHandler);
 
 // 全局前置中间件
 app.beforeRequest(utils.ignoreEndSlash)
-
+app.beforeRequest(utils.cors())
 app.beforeRequest(async (req, res)=>{
     console.log(`beforeRequest: there is a request on ${req.method} ${req.url}`);
 })
