@@ -441,7 +441,7 @@ export default class fw {
      */
     public body<T>(body: BodyType) {
         return function (target: T, propertyKey: string, parameterIndex: number) {
-            body.required = body.required || true;
+            // body.required = body.required || true;
             const api = (target as any)[propertyKey];
             let bodys = Reflect.getMetadata('__bodys', api) || [];
             bodys.push({ ...body, index: parameterIndex });
